@@ -1,113 +1,171 @@
-import Image from 'next/image'
+"use client";
+import styles from "../styles/Home.module.css";
+import {
+  useQuery,
+  useQueryClient,
+  useInfiniteQuery,
+  QueryClientProvider,
+  QueryClient,
+  useMutation,
+} from "@tanstack/react-query";
+// import Pagination from "@material-ui/lab/Pagination";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useIsFetching } from "@tanstack/react-query";
+import RootLayout from "./layout";
+import axios from "axios";
 
 export default function Home() {
+  const router = useRouter();
+  const [page, setPage] = useState(1);
+  const [first, setFirst] = useState("");
+  const [last, setlast] = useState("");
+  const queryClient = useQueryClient();
+
+  const fetchCharacter = async ({ pageParam }) => {
+    const res = await fetch(
+      "https://rickandmortyapi.com/api/character?page=" + pageParam
+    );
+    return res.json();
+  };
+
+  const {
+    data,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    status,
+  } = useInfiniteQuery({
+    queryKey: ["character"],
+    isStale: 500,
+    refetchOnMount: true,
+    queryFn: fetchCharacter,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      if (lastPage.info.next) return pages.length + 1;
+    },
+  });
+
+  const handleFunc = async () => {
+    const res = await fetch("http://192.168.0.141:3000/tests");
+    return res.json();
+  };
+
+  const { refetch, data: testsData } = useQuery({
+    queryKey: ["tests"],
+    queryFn: handleFunc,
+  });
+
+  const handlePost = async (data) => {
+    const response = await axios.post("http://192.168.0.141:3000/test", data);
+
+    const result = await response.data;
+
+    return result;
+  };
+
+  const { isPending, isSuccess, mutate } = useMutation({
+    mutationKey: ["test"],
+    mutationFn: handlePost,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tests"] }),
+  });
+
+  const handleDelete = async () => {
+    const response = await axios.delete("http://192.168.0.141:3000/tests");
+    return response;
+  };
+
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     queryClient.invalidateQueries("character"); // Invalidate the "character" query key
+  //   }, 5000); // Invalidate every 5 seconds (same as refetchInterval)
+
+  //   return () => clearInterval(interval);
+  // }, [queryClient]);
+  // useEffect(() => {
+  //   handleFunc();
+  // }, [val]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
+    <div className={styles.container}>
+      <button onClick={handleDelete}>Delete</button>
+      {/* <h1>{usersQuery?.data?.root}</h1> */}
+
+      {testsData?.root.map((item) => (
+        <>
+          <h1>First:{item.first_name}</h1>
+          <h1>Last:{item.last_name}</h1>
+        </>
+      ))}
+      <input
+        className="z-50 mb-2"
+        onChange={(e) => setFirst(e.target.value)}
+        value={first}
+      />
+      <input
+        className="z-50"
+        onChange={(e) => setlast(e.target.value)}
+        value={last}
+      />
+      <button
+        onClick={() =>
+          mutate({ first_name: first, last_name: last, is_active: true })
+        }
+      >
+        Submit
+      </button>
+      <h2>{first}</h2>
+      <h2>{last}</h2>
+      {/* <Pagination
+        count={data?.info.pages}
+        variant="outlined"
+        color="primary"
+        className={"pagination"}
+        style={{
+          marginBottom: "30px"
+        }}
+        page={page}
+        onChange={handlePaginationChange}
+      /> */}
+      {/* <button onClick={handleFunc}>Invalidate</button>
+       */}
+      <div className={styles.gridContainer}>
+        {data?.pages.map((page) => (
+          <>
+            {page.results.map((character) => (
+              <div key={character.id} className={styles.article}>
+                <img
+                  src={character.image}
+                  alt={character.name}
+                  height={200}
+                  loading="lazy"
+                  width={200}
+                />
+                <div className={styles.text}>
+                  <p>Name: {character.name}</p>
+                  <p>Lives in: {character.location.name}</p>
+                  <p>Species: {character.species}</p>
+                  <i>Id: {character.id} </i>
+                </div>
+              </div>
+            ))}
+          </>
+        ))}
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
+      <div>
+        <button
+          onClick={() => fetchNextPage()}
+          disabled={!hasNextPage || isFetchingNextPage}
+        >
+          {isFetchingNextPage
+            ? "Loading more..."
+            : hasNextPage
+            ? "Load More"
+            : "Nothing more to load"}
+        </button>
       </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+    </div>
+  );
 }
